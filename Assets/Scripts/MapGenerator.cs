@@ -2,6 +2,48 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+public struct MapMeshData
+{
+    public Vector3[] m_vertices;
+    public int[] m_indices;
+    public Vector2[] m_uvs;
+    public MapMeshData(int w, int h)
+    {
+        m_triangleCount = 0;
+        m_vertices = new Vector3[w * h];
+        m_indices = new int[(w - 1) * (h - 1) * 6];
+        m_uvs = new Vector2[w * h];
+    }
+    private int m_triangleCount;
+    private int IndexTail() { return 3 * m_triangleCount; }
+    public Mesh GenerateMesh()
+    {
+        Mesh ret = new Mesh();
+        ret.SetVertices(m_vertices);
+        ret.SetIndices(m_indices, MeshTopology.Triangles, 0);
+        ret.SetUVs(0, m_uvs);
+        return ret;
+    }
+    public void AddRectangle(int a, int b, int c, int d)
+    {
+        m_indices[IndexTail() + 0] = c;
+        m_indices[IndexTail() + 1] = b;
+        m_indices[IndexTail() + 2] = a;
+        m_indices[IndexTail() + 3] = b;
+        m_indices[IndexTail() + 4] = c;
+        m_indices[IndexTail() + 5] = d;
+        m_triangleCount += 2;
+    }
+    public void AddTriangle(int a, int b, int c)
+    {
+
+        m_indices[IndexTail() + 0] = a;
+        m_indices[IndexTail() + 1] = b;
+        m_indices[IndexTail() + 2] = c;
+        m_triangleCount++;
+    }
+}
+
 public static class MapGenerator
 {
     // width, height, octave, lacunarity, persistence, noise scale
@@ -49,6 +91,26 @@ public static class MapGenerator
             for (int y = 0; y < h; y++)
             {
                 ret[x, y] = (ret[x, y] - min) / (max - min);
+            }
+        return ret;
+    }
+
+    static public MapMeshData GenerateMapMeshData(float[,] map)
+    {
+        int w = map.GetLength(0), h = map.GetLength(1);
+        MapMeshData ret = new MapMeshData(w, h);
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                int vertIdx = x + y * w;
+                ret.m_vertices[vertIdx] = new Vector3(x, map[x,y] * (w / 10F), y);
+                ret.m_uvs[vertIdx] = new Vector2((float)x / (float)(w - 1), (float)y / (float)(h - 1));
+                //Debug.LogWarning($"uv set to {(float)x / (float)w},{(float)y / (float)h} on idx {x + y * w}");
+                if (x < w - 1 && y < h - 1)
+                    ret.AddRectangle(vertIdx,
+                        vertIdx + 1,
+                        vertIdx + w,
+                        vertIdx + w + 1);
             }
         return ret;
     }
