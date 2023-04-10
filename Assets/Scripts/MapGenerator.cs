@@ -95,22 +95,25 @@ public static class MapGenerator
         return ret;
     }
 
-    static public MapMeshData GenerateMapMeshData(float[,] map)
+    static public MapMeshData GenerateMapMeshData(float[,] map, float t /* tall */, AnimationCurve c, int d)
     {
+        int[] SkipVertPerLod = new int[]{ 1, 2, 4, 6, 8, 10, 12, 16, 20, 30, 40 };
+        int toSkip = SkipVertPerLod[d];
         int w = map.GetLength(0), h = map.GetLength(1);
-        MapMeshData ret = new MapMeshData(w, h);
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
+        MapMeshData ret = new MapMeshData(w / toSkip, h / toSkip);
+        for (int y = 0; y < h; y += toSkip)
+            for (int x = 0; x < w; x += toSkip)
             {
-                int vertIdx = x + y * w;
-                ret.m_vertices[vertIdx] = new Vector3(x, map[x,y] * (w / 10F), y);
+                int vertIdx = (x / toSkip) + (y / toSkip) * (w / toSkip);
+                //Debug.LogWarning($"new idx is {vertIdx} with x {x}, y {y}, w {w}, toSkip {toSkip}, length {ret.m_vertices.Length}");
+                ret.m_vertices[vertIdx] = new Vector3(x, c.Evaluate(map[x,y]) * t, y);
                 ret.m_uvs[vertIdx] = new Vector2((float)x / (float)(w - 1), (float)y / (float)(h - 1));
                 //Debug.LogWarning($"uv set to {(float)x / (float)w},{(float)y / (float)h} on idx {x + y * w}");
-                if (x < w - 1 && y < h - 1)
+                if (x < w - toSkip && y < h - toSkip)
                     ret.AddRectangle(vertIdx,
                         vertIdx + 1,
-                        vertIdx + w,
-                        vertIdx + w + 1);
+                        vertIdx + w / toSkip,
+                        vertIdx + w / toSkip + 1);
             }
         return ret;
     }

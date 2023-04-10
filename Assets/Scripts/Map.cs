@@ -23,7 +23,8 @@ public class Map : MonoBehaviour
         m_map = m;
         m_width = m_map.GetLength(0);
         m_height = m_map.GetLength(1);
-        m_filter.sharedMesh = MapGenerator.GenerateMapMeshData(m).GenerateMesh();
+        m_filter.sharedMesh = MapGenerator.GenerateMapMeshData(
+            m, m_heightMult, m_heightCurve, m_detailLevel).GenerateMesh();
     }
     public void Draw()
     {
@@ -44,15 +45,26 @@ public class Map : MonoBehaviour
 
     #region Generate map with given stat
     // for test(inspector) only
+    [Range(1, 10000)]
     [SerializeField] int m_gWidth = 30;
+    [Range(1, 10000)]
     [SerializeField] int m_gHeight = 30;
+    [Range(1, 10000)]
     [SerializeField] int m_gOctaves = 1;
+    [Range(0, 100)]
     [SerializeField] float m_gLacunarity = 1;
+    [Range(0, 100)]
     [SerializeField] float m_gPersistence = 1;
+    [Range(0, 100)]
     [SerializeField] float m_gScale = 1;
     [SerializeField] int m_gSeed = 1;
     [SerializeField] float m_gOffsetX = 1;
     [SerializeField] float m_gOffsetY = 1;
+    [Range(0, 100)]
+    [SerializeField] float m_heightMult = 1;
+    [SerializeField] AnimationCurve m_heightCurve;
+    [Range(0, 10)]
+    [SerializeField] int m_detailLevel = 1;
     public void GenerateNew()
     {
         SetMap(MapGenerator.GenerateNoise(
