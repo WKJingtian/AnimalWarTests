@@ -16,14 +16,6 @@ public struct MapMeshData
     }
     private int m_triangleCount;
     private int IndexTail() { return 3 * m_triangleCount; }
-    public Mesh GenerateMesh()
-    {
-        Mesh ret = new Mesh();
-        ret.SetVertices(m_vertices);
-        ret.SetIndices(m_indices, MeshTopology.Triangles, 0);
-        ret.SetUVs(0, m_uvs);
-        return ret;
-    }
     public void AddRectangle(int a, int b, int c, int d)
     {
         m_indices[IndexTail() + 0] = c;
@@ -41,6 +33,14 @@ public struct MapMeshData
         m_indices[IndexTail() + 1] = b;
         m_indices[IndexTail() + 2] = c;
         m_triangleCount++;
+    }
+
+    public void Report()
+    {
+        for (int i = 0; i < m_vertices.Length - 3; i += 3)
+        {
+            Debug.LogWarning($"v{i}: {m_vertices[i]}; v{i+1}: {m_vertices[i+1]}; v{i+2}: {m_vertices[i+2]}");
+        }
     }
 }
 
@@ -90,7 +90,7 @@ public static class MapGenerator
         for (int x = 0; x < w; x++)
             for (int y = 0; y < h; y++)
             {
-                ret[x, y] = (ret[x, y] - min) / (max - min);
+                ret[x, y] = (ret[x, y] - min) / Mathf.Max(0.01f, (max - min));
             }
         return ret;
     }
@@ -105,7 +105,7 @@ public static class MapGenerator
             for (int x = 0; x < w; x += toSkip)
             {
                 int vertIdx = (x / toSkip) + (y / toSkip) * (w / toSkip);
-                //Debug.LogWarning($"new idx is {vertIdx} with x {x}, y {y}, w {w}, toSkip {toSkip}, length {ret.m_vertices.Length}");
+                //Debug.LogWarning($"c.Evaluate(map[x,y]) * t {c.Evaluate(map[x, y]) * t} with map[x,y] {map[x, y]} and t {t}");
                 ret.m_vertices[vertIdx] = new Vector3(x, c.Evaluate(map[x,y]) * t, y);
                 ret.m_uvs[vertIdx] = new Vector2((float)x / (float)(w - 1), (float)y / (float)(h - 1));
                 //Debug.LogWarning($"uv set to {(float)x / (float)w},{(float)y / (float)h} on idx {x + y * w}");
@@ -115,6 +115,15 @@ public static class MapGenerator
                         vertIdx + w / toSkip,
                         vertIdx + w / toSkip + 1);
             }
+        return ret;
+    }
+
+    static public Mesh GenerateMapMesh(MapMeshData data)
+    {
+        Mesh ret = new Mesh();
+        ret.SetVertices(data.m_vertices);
+        ret.SetIndices(data.m_indices, MeshTopology.Triangles, 0);
+        ret.SetUVs(0, data.m_uvs);
         return ret;
     }
 }
