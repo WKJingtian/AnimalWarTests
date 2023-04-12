@@ -54,75 +54,60 @@ public class MapGenerationController : MonoBehaviour
     public Vector3 m_worldPos;
     public Material m_material;
 
+    struct ThreadInfo
+    {
+        public Map.MapData data;
+        public Action<Map.MapData> callback;
+    }
+    private Queue<ThreadInfo> m_threadReturns = new();
+    private void Update()
+    {
+        while (m_threadReturns.Count > 0)
+        {
+            var info = m_threadReturns.Dequeue();
+            info.callback(info.data);
+        }
+    }
+
     // multi-thread creation, after setting all the stuff, call generation here
-    public void GenerateNewMap(Action<Map> callback, Map result)
+    public void GenerateNewMap(Action<Map.MapData> callback, MapGenerationData generationData)
     { // generate a whole new map from beginning
-        MapGenerationData dataCopy = new MapGenerationData(m_data);
-        //ThreadStart job = delegate
+        ThreadStart job = delegate
         {
             float[,] ret = MapGenerator.GenerateNoise(
-                dataCopy.m_gWidth, dataCopy.m_gHeight, dataCopy.m_gOctaves,
-                dataCopy.m_gLacunarity, dataCopy.m_gPersistence,
-                dataCopy.m_gScale, dataCopy.m_gSeed,
-                dataCopy.m_gOffsetX, dataCopy.m_gOffsetY);
-            result.SetMap(ret);
-            GenerateMeshData(dataCopy, ret, callback, result);
-        };
-    }
-    private void GenerateMeshData(MapGenerationData data, float[,] map, Action<Map> callback, Map result)
-    {
-        //ThreadStart job = delegate
-        {
-            MapMeshData ret = MapGenerator.GenerateMapMeshData(
-                map, data.m_heightMult, data.m_heightCurve, data.m_detailLevel);
-            result.SetMeshData(ret);
-            //ret.Report();
-            GenerateTexture(data, map, null, result);
-            GenerateMesh(data, ret, callback, result);
-        };
-    }
-    public void GenerateMeshData(float[,] map, Action<Map> callback, Map result)
-    { // regenerate mesh data of existing map
-        MapGenerationData dataCopy = new MapGenerationData(m_data);
-        //ThreadStart job = delegate
-        {
-            MapMeshData ret = MapGenerator.GenerateMapMeshData(
-                map, dataCopy.m_heightMult, dataCopy.m_heightCurve, dataCopy.m_detailLevel);
-            result.SetMeshData(ret);
-            //ret.Report();
-            GenerateTexture(dataCopy, map, null, result);
-            GenerateMesh(dataCopy, ret, callback, result);
-        };
-    }
-    private void GenerateMesh(MapGenerationData data, MapMeshData map, Action<Map> callback, Map result)
-    {
-        Mesh ret = MapGenerator.GenerateMapMesh(map);
-        result.SetMesh(ret);
-        if (callback != null) callback(result);
-    }
-    public void GenerateMesh(MapMeshData map, Action<Map> callback, Map result)
-    {
-        Mesh ret = MapGenerator.GenerateMapMesh(map);
-        result.SetMesh(ret);
-        if (callback != null) callback(result);
-    }
-    private void GenerateTexture(MapGenerationData data, float[,] map, Action<Map> callback, Map result)
-    {
-        Texture2D tex = new Texture2D(data.m_gWidth, data.m_gHeight, TextureFormat.RGBA32, false);
-        //tex.filterMode = FilterMode.Point;
-        tex.wrapMode = TextureWrapMode.Clamp;
-        Color[] colors = new Color[data.m_gWidth * data.m_gHeight];
-        for (int i = 0; i < data.m_gWidth; i++)
-            for (int j = 0; j < data.m_gHeight; j++)
+                generationData.m_gWidth, generationData.m_gHeight, generationData.m_gOctaves,
+                generationData.m_gLacunarity, generationData.m_gPersistence,
+                generationData.m_gScale, generationData.m_gSeed,
+                generationData.m_gOffsetX, generationData.m_gOffsetY);
+            Map.MapData mapData = new Map.MapData();
+            mapData.m_map = ret;
+            lock (m_threadReturns)
             {
-                colors[i + data.m_gWidth * j] = data.m_terrain.GetTerrainOnHeight(map[i, j]).m_tColor;
+                m_threadReturns.Enqueue(new ThreadInfo { data = mapData, callback = callback });
             }
-        tex.SetPixels(colors);
-        tex.Apply();
-        result.SetTexture(tex);
-        if (callback != null) callback(result);
+        };
+        new Thread(job).Start();
     }
-    public void GenerateTexture(float[,] map, Action<Map> callback, Map result)
+    public void GenerateMeshData(Action<Map.MapData> callback, MapGenerationData generationData, Map.MapData mapData)
+    {
+        ThreadStart job = delegate
+        {
+            MapMeshData ret = MapGenerator.GenerateMapMeshData(
+                mapData.m_map, generationData.m_heightMult, generationData.m_heightCurve, generationData.m_detailLevel);
+            mapData.m_meshData = ret;
+            lock (m_threadReturns)
+            {
+                m_threadReturns.Enqueue(new ThreadInfo { data = mapData, callback = callback });
+            }
+        };
+        new Thread(job).Start();
+    }
+    public void GenerateMesh(Map map, Map.MapData mapData)
+    {
+        Mesh ret = MapGenerator.GenerateMapMesh(mapData.m_meshData);
+        map.SetMesh(ret);
+    }
+    public void GenerateTexture(Map map, Map.MapData mapData)
     {
         Texture2D tex = new Texture2D(m_data.m_gWidth, m_data.m_gHeight, TextureFormat.RGBA32, false);
         //tex.filterMode = FilterMode.Point;
@@ -131,33 +116,35 @@ public class MapGenerationController : MonoBehaviour
         for (int i = 0; i < m_data.m_gWidth; i++)
             for (int j = 0; j < m_data.m_gHeight; j++)
             {
-                colors[i + m_data.m_gWidth * j] = m_data.m_terrain.GetTerrainOnHeight(map[i, j]).m_tColor;
+                colors[i + m_data.m_gWidth * j] = m_data.m_terrain.GetTerrainOnHeight(mapData.m_map[i, j]).m_tColor;
             }
         tex.SetPixels(colors);
         tex.Apply();
-        result.SetTexture(tex);
-        if (callback != null) callback(result);
+        map.SetTexture(tex);
     }
 
     public void OnGenerateBtnPressed()
     {
         foreach (var child in transform.GetComponentsInChildren<Map>())
-            DestroyImmediate(child.gameObject);
+            Destroy(child.gameObject);
 
-        // copy the data that will be used after generation
-        var obj = new GameObject("map");
-        Transform t = m_parent;
-        Vector3 p = m_worldPos;
-        Material m = m_material;
-        MeshFilter f = obj.AddComponent<MeshFilter>();
-        Renderer r = obj.AddComponent<MeshRenderer>();
-
-        GenerateNewMap((Map map) =>
+        MapGenerationData dataCopy = new MapGenerationData(m_data);
+        GenerateNewMap((Map.MapData map) =>
         {
-            map.transform.SetParent(t);
-            map.transform.position = p;
-            r.material = m;
-            map.SetRenderObj(f, r);
-        }, obj.AddComponent<Map>());
+            GenerateMeshData((Map.MapData map) =>
+            {
+                var obj = new GameObject("map");
+                obj.transform.parent = m_parent;
+                obj.transform.position = m_worldPos;
+                var m = obj.AddComponent<Map>();
+                var f = obj.AddComponent<MeshFilter>();
+                var r = obj.AddComponent<MeshRenderer>();
+                r.material = m_material;
+                GenerateMesh(m, map);
+                GenerateTexture(m, map);
+                m.SetData(map);
+                m.SetRenderObj(f, r);
+            }, dataCopy, map);
+        }, dataCopy);
     }
 }

@@ -6,30 +6,34 @@ public class Map : MonoBehaviour
 {
     [SerializeField] private MeshFilter m_filter;
     [SerializeField] private Renderer m_renderer;
-    float[,] m_map;
-    int m_width;
-    int m_height;
-    MapTerrain m_terrain;
-    MapMeshData m_meshData;
     Mesh m_mesh;
     Texture2D m_texture;
 
+    public struct MapData
+    {
+        public float[,] m_map;
+        public int m_width;
+        public int m_height;
+        public MapTerrain m_terrain;
+        public MapMeshData m_meshData;
+    }
+    MapData m_data;
+
+    public void SetData(MapData d)
+    {
+        m_data = d;
+        SetMap(m_data.m_map);
+        SetMeshData(m_data.m_meshData);
+    }
     public void SetMap(float[,] m)
     {
-        m_map = m;
-        m_width = m_map.GetLength(0);
-        m_height = m_map.GetLength(1);
-        //m_terrain = new();
-        //m_terrain.AddTerrain("deep water", -1, 0.2f, 1, new Color(0.1f, 0.1f, 0.4f, 1));
-        //m_terrain.AddTerrain("water", 0.15f, 0.35f, 1, new Color(0.2f, 0.2f, 0.8f, 1));
-        //m_terrain.AddTerrain("sand", 0.3499f, 0.4f, 1, new Color(0.8f, 0.8f, 0.3f, 1));
-        //m_terrain.AddTerrain("grass", 0.3999f, 0.6f, 1, new Color(0.2f, 0.8f, 0.2f, 1));
-        //m_terrain.AddTerrain("mountain", 0.5999f, 0.95f, 3, new Color(0.5f, 0.3f, 0.1f, 1));
-        //m_terrain.AddTerrain("peak", 0.9f, 10f, 1, new Color(0.95f, 0.95f, 0.95f, 1));
+        m_data.m_map = m;
+        m_data.m_width = m_data.m_map.GetLength(0);
+        m_data.m_height = m_data.m_map.GetLength(1);
     }
     public void SetMeshData(MapMeshData data)
     {
-        m_meshData = data;
+        m_data.m_meshData = data;
     }
     public void SetMesh(Mesh mesh)
     {
